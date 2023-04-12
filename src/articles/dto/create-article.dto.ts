@@ -7,4 +7,5 @@ export class CreateArticleDto {
   name?: string;
   title: string;
   content: string;
+  image: string;
 }
