@@ -9,10 +9,17 @@ import {
   HttpStatus,
   NotFoundException,
   BadGatewayException,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
 } from '@nestjs/common';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { Article as ArticleModel } from '@prisma/client';
 import { ArticlesService } from './articles.service';
+import { Express } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('articles')
 export class ArticlesController {
@@ -40,10 +47,26 @@ export class ArticlesController {
 
   //Create article
   @Post()
-  postArticle(@Body() createArticleDto: CreateArticleDto): string {
+  @UseInterceptors(FileInterceptor('image'))
+  postArticle(
+    @Body() createArticleDto: CreateArticleDto,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 50000 }),
+          new FileTypeValidator({ fileType: 'image/jpeg' }),
+        ],
+      }),
+    )
+    image: Express.Multer.File,
+  ): Promise<ArticleModel> {
     try {
-      this.articleService.createArticle(createArticleDto);
-      return `Status code: ${HttpStatus.ACCEPTED}. Successfully added new article!`;
+      console.log(image.buffer.toString());
+      const data = {
+        ...createArticleDto,
+        image: image.originalname.toString(),
+      };
+      return this.articleService.createArticle(data);
     } catch (err) {
       throw new BadGatewayException();
     }
