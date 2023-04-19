@@ -12,7 +12,7 @@ import {
   UseInterceptors,
   UploadedFile,
   ParseFilePipe,
-  MaxFileSizeValidator,
+  // MaxFileSizeValidator,
   FileTypeValidator,
 } from '@nestjs/common';
 import { CreateArticleDto } from './dto/create-article.dto';
@@ -20,6 +20,9 @@ import { Article as ArticleModel } from '@prisma/client';
 import { ArticlesService } from './articles.service';
 import { Express } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import path = require('path');
+import { uuid } from 'uuidv4';
 
 @Controller('articles')
 export class ArticlesController {
@@ -47,24 +50,33 @@ export class ArticlesController {
 
   //Create article
   @Post()
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(
+    FileInterceptor('image', {
+      storage: diskStorage({
+        destination: './public/images',
+        filename: (req, file, cb) => {
+          const filename: string =
+            path.parse(file.originalname).name.replace(/\s/g, '') + uuid();
+          const extension: string = path.parse(file.originalname).ext;
+
+          cb(null, `${filename}${extension}`);
+        },
+      }),
+    }),
+  )
   postArticle(
     @Body() createArticleDto: CreateArticleDto,
     @UploadedFile(
       new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 50000 }),
-          new FileTypeValidator({ fileType: 'image/jpeg' }),
-        ],
+        validators: [new FileTypeValidator({ fileType: 'image/jpeg' })],
       }),
     )
     image: Express.Multer.File,
   ): Promise<ArticleModel> {
     try {
-      console.log(image.buffer.toString());
       const data = {
         ...createArticleDto,
-        image: image.originalname.toString(),
+        image: `/${image.path}`,
       };
       return this.articleService.createArticle(data);
     } catch (err) {
